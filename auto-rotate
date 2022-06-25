@@ -47,50 +47,69 @@ remove_keyboard(){
 
 MAIN_SCREEN=$(xrandr --current | grep connected | mawk -W interactive '/primary/ {print $1}')
 echo "$MAIN_SCREEN"
+xrandr --output "$MAIN_SCREEN" --rotate normal
+current_rot=normal
 monitor-sensor | mawk -W interactive '/Accelerometer orientation changed:/ { print $NF; fflush();}' | while read -r line
 do
     echo "$line"
     # If we have external monitor connected, do not rotate
     nscreens=$(xrandr  | grep -c " connected")
-    if [ "$nscreens" != 1 ]
+    if [ $nscreens -ne 1 ]
     then
-        line=normal
+	continue
     fi
 
+    if [ $line = $current_rot ]
+    then
+	continue
+    fi
+
+    # refresh main screen variable, because screen may have been disconnected / reconfigured after boot
+    MAIN_SCREEN=$(xrandr --current | grep connected | mawk -W interactive '/primary/ {print $1}')
+    echo "$MAIN_SCREEN"
+    
     # Set the actions to be taken for each possible orientation
     case "$line" in
         normal)
+            xrandr --output "$MAIN_SCREEN" --rotate normal
+	    #xrandr -o normal
             # re-enable backlight
             dbus-send --print-reply=literal --type=method_call --system --dest=org.freedesktop.UPower /org/freedesktop/UPower/KbdBacklight org.freedesktop.UPower.KbdBacklight.SetBrightness int32:1
             remove_keyboard enable
-            xrandr --output "$MAIN_SCREEN" --rotate normal
             rotate_cursor 1 0 0 0 1 0 0 0 1
             install_background normal
             ;;
         bottom-up)
+            xrandr --output "$MAIN_SCREEN" --rotate inverted
+	    #xrandr -o inverted
             # disable backlight
             dbus-send --print-reply=literal --type=method_call --system --dest=org.freedesktop.UPower /org/freedesktop/UPower/KbdBacklight org.freedesktop.UPower.KbdBacklight.SetBrightness int32:0
             remove_keyboard disable
-            xrandr --output "$MAIN_SCREEN" --rotate inverted
             rotate_cursor -1 0 1 0 -1 1 0 0 1
             install_background bottom-up
             ;;
         right-up)
+            xrandr --output "$MAIN_SCREEN" --rotate right
+	    #xrandr -o right
             # disable backlight
             dbus-send --print-reply=literal --type=method_call --system --dest=org.freedesktop.UPower /org/freedesktop/UPower/KbdBacklight org.freedesktop.UPower.KbdBacklight.SetBrightness int32:0
             remove_keyboard disable
-            xrandr --output "$MAIN_SCREEN" --rotate right
             rotate_cursor 0 1 0 -1 0 1 0 0 1
             install_background right-up
             ;;
         left-up)
+            xrandr --output "$MAIN_SCREEN" --rotate left
+	    #xrandr -o left
             # disable backlight
             dbus-send --print-reply=literal --type=method_call --system --dest=org.freedesktop.UPower /org/freedesktop/UPower/KbdBacklight org.freedesktop.UPower.KbdBacklight.SetBrightness int32:0
             remove_keyboard disable
-            xrandr --output "$MAIN_SCREEN" --rotate left
             rotate_cursor 0 -1 1 1 0 0 0 0 1
             install_background left-up
             ;;
     esac
+
+    current_rot="$line"
+    echo current_rot="$current_rot"
+
 done
 exit 0
